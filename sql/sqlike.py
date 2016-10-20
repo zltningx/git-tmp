@@ -98,7 +98,7 @@ class SqlManager(object):
                 if ',' in v.group(2):
                     pass
                 else:
-                    self.select_single(v.group(1), v.group(2), v.group(3).split())
+                    self.select_single(v.group(1), v.group(2), v.group(3))
             else:
                 v = re.match(r'select\s+(.*\S)\s+from\s+(.*\S)', string)
                 if ',' in v.group(2):
@@ -175,7 +175,7 @@ class SqlManager(object):
         data_dict = self.pickle_load(table_name)
 
         if condition_list is not None:
-            self.deal_condition(condition_list)
+            self.deal_condition(condition_list, data_dict)
         elif attr_list == '*':
             for item in data_dict.dk_dict:
                 for key, value in item.items():
@@ -188,12 +188,32 @@ class SqlManager(object):
                         print("{} : {}".format(key, value), end=" ")
                 print()
 
-    def deal_condition(self, condition_list):
-        for condition in condition_list:
-            if condition == 'and' or condition == 'or':
+    def deal_condition(self, condition_list, data_dict):
+        if 'or' in condition_list:
+            or_conditon_list = condition_list.split('or')
+            for or_conditon in or_conditon_list:
+                if 'and' in or_conditon:
+                    and_condition_list = or_conditon.split('and')
+                    for and_conditon in and_condition_list:
+                        pass
+                else:
+                    pass
+        elif 'and' in condition_list:
+            and_condition_list = condition_list.split('and')
+            for and_conditon in and_condition_list:
                 pass
-            else:
-                pass
+        else:
+            self.isValued(condition_list, data_dict)
+
+    def isValued(self, condition, data_dict):
+        v = re.match(r'(\w+)\s*(=|!=|>|<|>=|<=)\s*(\w+|\d+)', condition)
+        try:
+            if v.group(1) not in data_dict.get_keys():
+                print("key not in table plz checkout it")
+                return False
+        except:
+            pass
+        return True
 
     def pickle_load(self, f_name):
         with open(f_name, 'rb') as file:
