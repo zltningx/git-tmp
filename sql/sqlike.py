@@ -6,6 +6,16 @@ from queue import Queue
 import bisect
 
 
+def combine_list(list_a, list_b):
+    new_list = list()
+    for a_value in list_a:
+        for b_value in list_b:
+            if a_value not in new_list:
+                new_list.append(a_value)
+            elif b_value not in new_list:
+                new_list.append(b_value)
+    return new_list
+
 class DataDict(object):
     def __init__(self, table_name):
         self.tableName = table_name
@@ -175,7 +185,8 @@ class SqlManager(object):
         data_dict = self.pickle_load(table_name)
 
         if condition_list is not None:
-            self.deal_condition(condition_list, data_dict)
+            result_set = self.deal_condition(condition_list, data_dict)
+            print(result_set)
         elif attr_list == '*':
             for item in data_dict.dk_dict:
                 for key, value in item.items():
@@ -189,38 +200,48 @@ class SqlManager(object):
                 print()
 
     def deal_condition(self, condition_list, data_dict):
-        table_set = set()
+        table_list = list()
         if 'or' in condition_list:
             or_condition_list = condition_list.split('or')
             for or_condition in or_condition_list:
                 if 'and' in or_condition:
-                    tmp_set = set()
+                    tmp_list = list()
                     and_condition_list = or_condition.split('and')
-                    for and_condition in and_condition_list:
+                    for i, and_condition in enumerate(and_condition_list):
                         line_list = self.isValued(and_condition, data_dict)
                         if line_list is None or not line_list:
-                            tmp_set = set()
+                            tmp_list = list()
                             break
-                        tmp_set = tmp_set & line_list
-                    table_set = table_set | tmp_set
+                        if i == 0:
+                            tmp_list = line_list
+                        else:
+                            tmp_list = [value for value in tmp_list if value in line_list]
+                        if not tmp_list:
+                            break
+                    table_list = combine_list(table_list, tmp_list)
                 else:
                     line_list = self.isValued(or_condition, data_dict)
                     if line_list is None:
                         continue
-                    table_set = table_set | line_list
+                    table_list = combine_list(table_list, line_list)
         elif 'and' in condition_list:
             and_condition_list = condition_list.split('and')
-            for and_condition in and_condition_list:
+            for i, and_condition in enumerate(and_condition_list):
                 line_list = self.isValued(and_condition, data_dict)
                 if line_list is None or not line_list:
-                    return set()
-                table_set = table_set & line_list
+                    return list()
+                if i == 0:
+                    table_list = line_list
+                else:
+                    table_list = [value for value in table_list if value in line_list]
+                if not table_list:
+                    return table_list
         else:
-            table_set = self.isValued(condition_list, data_dict)
-        return table_set
+            table_list = self.isValued(condition_list, data_dict)
+        return table_list
 
     def isValued(self, condition, data_dict):
-        v = re.match(r'(\w+)\s*(=|!=|>|<|>=|<=)\s*(\w+|\d+)', condition)
+        v = re.match(r'\s*(\w+)\s*(=|!=|>|<|>=|<=)\s*(\w+|\d+)', condition)
         try:
             if v.group(1) not in data_dict.get_keys():
                 print("key not in table plz checkout it")
@@ -229,31 +250,31 @@ class SqlManager(object):
                 key = v.group(1)
                 operator = v.group(2)
                 value = v.group(3)
-                line_list = set()
+                line_list = list()
                 if operator == '=':
                     for item in data_dict.dk_dict:
-                        if item[key] == value:
-                            line_list.add(item)
+                        if str(item[key]) == value:
+                            line_list.append((data_dict.tableName, item))
                 elif operator == '!=':
                     for item in data_dict.dk_dict:
-                        if item[key] != value:
-                            line_list.add(item)
+                        if str(item[key]) != value:
+                            line_list.append((data_dict.tableName, item))
                 elif operator == '>':
                     for item in data_dict.dk_dict:
-                        if item[key] > value:
-                            line_list.add(item)
+                        if str(item[key]) > value:
+                            line_list.append((data_dict.tableName, item))
                 elif operator == '<':
                     for item in data_dict.dk_dict:
-                        if item[key] < value:
-                            line_list.add(item)
+                        if str(item[key]) < value:
+                            line_list.add((data_dict.tableName, item))
                 elif operator == '>=':
                     for item in data_dict.dk_dict:
-                        if item[key] >= value:
-                            line_list.add(item)
+                        if str(item[key]) >= value:
+                            line_list.add((data_dict.tableName, item))
                 elif operator == '<=':
                     for item in data_dict.dk_dict:
-                        if item[key] <= value:
-                            line_list.add(item)
+                        if str(item[key]) <= value:
+                            line_list.add((data_dict.tableName, item))
                 return line_list
         except Exception as e:
             print(e)
