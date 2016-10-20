@@ -1,0 +1,6 @@
+create table ss {s int primary key, a char, b char}
+insert into ss values(1, a,fdas)
+insert into ss values(2, sad,232)
+insert into ss values(10, as,fas2)
+create index i on ss (s, a)
+insert into ss values(3, aass,fr2)
