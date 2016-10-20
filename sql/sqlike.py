@@ -189,31 +189,75 @@ class SqlManager(object):
                 print()
 
     def deal_condition(self, condition_list, data_dict):
+        table_set = set()
         if 'or' in condition_list:
-            or_conditon_list = condition_list.split('or')
-            for or_conditon in or_conditon_list:
-                if 'and' in or_conditon:
-                    and_condition_list = or_conditon.split('and')
-                    for and_conditon in and_condition_list:
-                        pass
+            or_condition_list = condition_list.split('or')
+            for or_condition in or_condition_list:
+                if 'and' in or_condition:
+                    tmp_set = set()
+                    and_condition_list = or_condition.split('and')
+                    for and_condition in and_condition_list:
+                        line_list = self.isValued(and_condition, data_dict)
+                        if line_list is None or not line_list:
+                            tmp_set = set()
+                            break
+                        tmp_set = tmp_set & line_list
+                    table_set = table_set | tmp_set
                 else:
-                    pass
+                    line_list = self.isValued(or_condition, data_dict)
+                    if line_list is None:
+                        continue
+                    table_set = table_set | line_list
         elif 'and' in condition_list:
             and_condition_list = condition_list.split('and')
-            for and_conditon in and_condition_list:
-                pass
+            for and_condition in and_condition_list:
+                line_list = self.isValued(and_condition, data_dict)
+                if line_list is None or not line_list:
+                    return set()
+                table_set = table_set & line_list
         else:
-            self.isValued(condition_list, data_dict)
+            table_set = self.isValued(condition_list, data_dict)
+        return table_set
 
     def isValued(self, condition, data_dict):
         v = re.match(r'(\w+)\s*(=|!=|>|<|>=|<=)\s*(\w+|\d+)', condition)
         try:
             if v.group(1) not in data_dict.get_keys():
                 print("key not in table plz checkout it")
-                return False
-        except:
-            pass
-        return True
+                return None
+            else:
+                key = v.group(1)
+                operator = v.group(2)
+                value = v.group(3)
+                line_list = set()
+                if operator == '=':
+                    for item in data_dict.dk_dict:
+                        if item[key] == value:
+                            line_list.add(item)
+                elif operator == '!=':
+                    for item in data_dict.dk_dict:
+                        if item[key] != value:
+                            line_list.add(item)
+                elif operator == '>':
+                    for item in data_dict.dk_dict:
+                        if item[key] > value:
+                            line_list.add(item)
+                elif operator == '<':
+                    for item in data_dict.dk_dict:
+                        if item[key] < value:
+                            line_list.add(item)
+                elif operator == '>=':
+                    for item in data_dict.dk_dict:
+                        if item[key] >= value:
+                            line_list.add(item)
+                elif operator == '<=':
+                    for item in data_dict.dk_dict:
+                        if item[key] <= value:
+                            line_list.add(item)
+                return line_list
+        except Exception as e:
+            print(e)
+            return None
 
     def pickle_load(self, f_name):
         with open(f_name, 'rb') as file:
