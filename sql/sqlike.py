@@ -279,6 +279,15 @@ class SqlManager(object):
             table_list = self.isValued(condition_list, data_dict)
         return table_list
 
+    def isValued2(self, condition, table_dict):
+        v = re.match(r'\s*(\w+)\.(\w+)\s*(=|!=|>|<|>=|<=)\s*(\w+)\.(\w+|\d+)',
+                     condition)
+        try:
+            if v.group(1) not in table_dict.get_keys():
+                pass
+            else:
+                pass
+
     def isValued(self, condition, data_dict):
         v = re.match(r'\s*(\w+)\s*(=|!=|>|<|>=|<=)\s*(\w+|\d+)', condition)
         try:
