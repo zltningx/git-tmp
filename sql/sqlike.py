@@ -8,11 +8,15 @@ import bisect
 
 def combine_list(list_a, list_b):
     new_list = list()
+    if not list_a:
+        return list_b
+    elif not list_b:
+        return list_a
     for a_value in list_a:
         for b_value in list_b:
             if a_value not in new_list:
                 new_list.append(a_value)
-            elif b_value not in new_list:
+            if b_value not in new_list:
                 new_list.append(b_value)
     return new_list
 
@@ -106,13 +110,13 @@ class SqlManager(object):
             if 'where' in string:
                 v = re.match(r'select\s+(.*\S)\s+from\s+(.*\S)\s+where\s*(.*\S)', string)
                 if ',' in v.group(2):
-                    pass
+                    self.select_multi(v.group(1), v.group(2), v.group(3))
                 else:
                     self.select_single(v.group(1), v.group(2), v.group(3))
             else:
                 v = re.match(r'select\s+(.*\S)\s+from\s+(.*\S)', string)
                 if ',' in v.group(2):
-                    pass
+                    self.select_multi(v.group(1), v.group(2))
                 else:
                     self.select_single(v.group(1), v.group(2))
 
@@ -185,8 +189,12 @@ class SqlManager(object):
         data_dict = self.pickle_load(table_name)
 
         if condition_list is not None:
-            result_set = self.deal_condition(condition_list, data_dict)
-            print(result_set)
+            result_list = self.deal_condition(condition_list, data_dict)
+            print(result_list)
+            if attr_list == "*":
+                pass
+            else:
+                pass
         elif attr_list == '*':
             for item in data_dict.dk_dict:
                 for key, value in item.items():
@@ -198,6 +206,37 @@ class SqlManager(object):
                     if key in attr_list:
                         print("{} : {}".format(key, value), end=" ")
                 print()
+
+    def select_multi(self, attr_list, table_name_list, condition_list=None):
+        goahead = False
+        table_dict = dict()
+        table_name_list = table_name_list.split(',')
+        for table_name in table_name_list:
+            for f_name in os.listdir('.'):
+                if f_name == table_name.strip():
+                    goahead = True
+            if not goahead:
+                print("table {} doesn't exist".format(table_name.strip()))
+                return
+            table_dict[table_name.strip()] = self.pickle_load(table_name.strip())
+
+        if condition_list is not None:
+            pass
+        elif attr_list == '*':
+            for table_name in table_name_list:
+                print("Table---->{}<-----".format(table_name.strip()))
+                for item in table_dict[table_name.strip()].dk_dict:
+                    for key, value in item.items():
+                        print("{} : {}".format(key, value), end=" ")
+                    print()
+        else:
+            for table_name in table_name_list:
+                print("Table---->{}<-----".format(table_name.strip()))
+                for item in table_dict[table_name.strip()].dk_dict:
+                    for key, value in item.items():
+                        if key in attr_list:
+                            print("{} : {}".format(key, value), end=" ")
+                    print()
 
     def deal_condition(self, condition_list, data_dict):
         table_list = list()
@@ -266,15 +305,15 @@ class SqlManager(object):
                 elif operator == '<':
                     for item in data_dict.dk_dict:
                         if str(item[key]) < value:
-                            line_list.add((data_dict.tableName, item))
+                            line_list.append((data_dict.tableName, item))
                 elif operator == '>=':
                     for item in data_dict.dk_dict:
                         if str(item[key]) >= value:
-                            line_list.add((data_dict.tableName, item))
+                            line_list.append((data_dict.tableName, item))
                 elif operator == '<=':
                     for item in data_dict.dk_dict:
                         if str(item[key]) <= value:
-                            line_list.add((data_dict.tableName, item))
+                            line_list.append((data_dict.tableName, item))
                 return line_list
         except Exception as e:
             print(e)
