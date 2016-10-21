@@ -279,14 +279,33 @@ class SqlManager(object):
             table_list = self.isValued(condition_list, data_dict)
         return table_list
 
+    def index_check_return(self, table):
+        if table.index_name is None:
+            return False
+        index = self.pickle_load(table.index_name)
+        return index.attribute_list_index
+
     def isValued2(self, condition, table_dict):
         v = re.match(r'\s*(\w+)\.(\w+)\s*(=|!=|>|<|>=|<=)\s*(\w+)\.(\w+|\d+)',
                      condition)
         try:
-            if v.group(1) not in table_dict.get_keys():
-                pass
-            else:
-                pass
+            f_table = v.group(1)
+            s_table = v.group(4)
+            f_key = v.group(2)
+            s_key = v.group(5)
+            operator = v.group(3)
+            if (f_table not in table_dict.keys()
+                or s_table not in table_dict.keys()):
+                print("table name not matching")
+                return None
+            if (f_key not in table_dict[f_table]
+                or s_key not in table_dict[s_table]):
+                print("table not have attribute you given")
+                return None
+            f_index_in = self.index_check_return(table_dict[f_table])
+            s_index_in = self.index_check_return(table_dict[s_table])
+        except:
+            pass
 
     def isValued(self, condition, data_dict):
         v = re.match(r'\s*(\w+)\s*(=|!=|>|<|>=|<=)\s*(\w+|\d+)', condition)
@@ -298,30 +317,51 @@ class SqlManager(object):
                 key = v.group(1)
                 operator = v.group(2)
                 value = v.group(3)
+                if value.isdigit():
+                    value = int(value)
                 line_list = list()
+                index_in = self.index_check_return(data_dict)
+                if index_in:
+                    if key not in index_in.keys():
+                        index_in = False
                 if operator == '=':
-                    for item in data_dict.dk_dict:
-                        if str(item[key]) == value:
-                            line_list.append((data_dict.tableName, item))
+                    if index_in:
+                        datas = index_in[key]
+                        for i, data in enumerate(datas):
+                            if data[0] == value:
+                                line_list.append((data_dict.tableName, data[1]))
+                                if datas[i + 1] != value:
+                                    break
+                    else:
+                        for item in data_dict.dk_dict:
+                            if item[key] == value:
+                                line_list.append((data_dict.tableName, item))
                 elif operator == '!=':
                     for item in data_dict.dk_dict:
-                        if str(item[key]) != value:
+                        if item[key] != value:
                             line_list.append((data_dict.tableName, item))
                 elif operator == '>':
-                    for item in data_dict.dk_dict:
-                        if str(item[key]) > value:
-                            line_list.append((data_dict.tableName, item))
+                    if index_in:
+                        datas = index_in[key]
+                        for i, data in enumerate(datas):
+                            if data[0] > value:
+                                line_list.append((data_dict.tableName, data[1]))
+                                break
+                    else:
+                        for item in data_dict.dk_dict:
+                            if item[key] > value:
+                                line_list.append((data_dict.tableName, item))
                 elif operator == '<':
                     for item in data_dict.dk_dict:
-                        if str(item[key]) < value:
+                        if item[key] < value:
                             line_list.append((data_dict.tableName, item))
                 elif operator == '>=':
                     for item in data_dict.dk_dict:
-                        if str(item[key]) >= value:
+                        if item[key] >= value:
                             line_list.append((data_dict.tableName, item))
                 elif operator == '<=':
                     for item in data_dict.dk_dict:
-                        if str(item[key]) <= value:
+                        if item[key] <= value:
                             line_list.append((data_dict.tableName, item))
                 return line_list
         except Exception as e:
