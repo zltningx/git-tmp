@@ -81,12 +81,15 @@ class SqlManager(object):
             v = re.match(r'create\s+table\s+(\w+)', string)
             self.create(string)
         elif command[0] == "insert" and command[1] == 'into':
-            v = re.match(r'insert\s+into\s+(\w+)\s+\((.*)\)\s+values\s*\((.*)\)', string)
+            v = re.match(
+                r'insert\s+into\s+(\w+)\s+\((.*)\)\s+values\s*\((.*)\)'
+                , string)
             try:
                 self.insert(v.group(1), v.group(2), v.group(3))
             except:
                 try:
-                    v = re.match(r'insert\s+into\s+(\w+)\s+values\s*\((.*)\)', string)
+                    v = re.match(r'insert\s+into\s+(\w+)\s+values\s*\((.*)\)'
+                                 , string)
                     self.insert(v.group(1), None, v.group(2))
                 except Exception as e:
                     print(e)
@@ -94,21 +97,27 @@ class SqlManager(object):
 
         elif command[0] == "delete" and command[1] == 'from':
             if 'where' in string:
-                v = re.match(r'delete\s+from\s+(\w+)\s+where\s+(.*\S)', string)
+                v = re.match(r'delete\s+from\s+(\w+)\s+where\s+(.*\S)'
+                             , string)
+                self.delete(v.group(1), v.group(2))
             else:
                 v = re.match(r'delete\s+from\s+(\w+)', string)
-            self.delete(string)
+                self.delete(v.group(1))
 
         elif command[0] == "update" and command[2] == 'set':
             if 'where' in string:
-                v = re.match(r'update\s+(\w+)\s+set\s+(\w+)\s+=\s+(\w+)\s+where\s+(.*\S)', string)
+                v = re.match(
+                    r'update\s+(\w+)\s+set\s+(\w+)\s+=\s+(\w+)\s+where\s+(.*\S)'
+                    , string)
             else:
-                v = re.match(r'update\s+(\w+)\s+set\s+(\w+)\s+=\s+(\w+)', string)
+                v = re.match(r'update\s+(\w+)\s+set\s+(\w+)\s+=\s+(\w+)'
+                             , string)
             self.update(string)
 
         elif command[0] == "select":
             if 'where' in string:
-                v = re.match(r'select\s+(.*\S)\s+from\s+(.*\S)\s+where\s*(.*\S)', string)
+                v = re.match(r'select\s+(.*\S)\s+from\s+(.*\S)\s+where\s*(.*\S)'
+                             , string)
                 if ',' in v.group(2):
                     self.select_multi(v.group(1), v.group(2), v.group(3))
                 else:
@@ -120,17 +129,20 @@ class SqlManager(object):
                 else:
                     self.select_single(v.group(1), v.group(2))
 
-        elif command[0] == "alter" and command[1] == 'table' and command[3] == 'add':
+        elif command[0] == "alter" and command[1] == 'table' \
+                and command[3] == 'add':
             v = re.match(r'alter\s+table\s+(\w+)\s+add\s+(.*\S)', string)
             self.alter_add(string)
-        elif command[0] == "alter" and command[1] == 'table' and command[3] == 'drop':
+        elif command[0] == "alter" and command[1] == 'table' \
+                and command[3] == 'drop':
             v = re.match(r'alter\s+table\s+(\w+)\s+drop\s+(.*\S)', string)
             self.alter_drop(string)
         elif command[0] == 'drop':
             v = re.match(r'drop\s+table\s+(\w+)', string)
             self.drop(string)
         elif command[0] == 'create' and command[1] == 'index':
-            v = re.match(r'create\s+index\s+(\w+)\s+on\s+(.*\S)\s+\((.*)\)', string)
+            v = re.match(r'create\s+index\s+(\w+)\s+on\s+(.*\S)\s+\((.*)\)'
+                         , string)
             self.create_index(v.group(1), v.group(2), v.group(3))
         else:
             print("Error Command")
@@ -221,7 +233,12 @@ class SqlManager(object):
             table_dict[table_name.strip()] = self.pickle_load(table_name.strip())
 
         if condition_list is not None:
-            pass
+            result_list = self.deal_condition(condition_list, table_dict)
+            print(result_list)
+            if attr_list == "*":
+                pass
+            else:
+                pass
         elif attr_list == '*':
             for table_name in table_name_list:
                 print("Table---->{}<-----".format(table_name.strip()))
@@ -294,18 +311,45 @@ class SqlManager(object):
             f_key = v.group(2)
             s_key = v.group(5)
             operator = v.group(3)
+            line_list = list()
             if (f_table not in table_dict.keys()
                 or s_table not in table_dict.keys()):
                 print("table name not matching")
                 return None
-            if (f_key not in table_dict[f_table]
-                or s_key not in table_dict[s_table]):
+            if (f_key not in table_dict[f_table].key_value.keys()
+                or s_key not in table_dict[s_table].key_value.keys()):
                 print("table not have attribute you given")
+                return None
+            if (table_dict[f_table].key_value[f_key]
+                not in table_dict[s_table].key_value[s_key]
+                or table_dict[s_table].key_value[s_key]
+                not in table_dict[f_table].key_value[f_key]):
+                print("attributes has different type")
                 return None
             f_index_in = self.index_check_return(table_dict[f_table])
             s_index_in = self.index_check_return(table_dict[s_table])
-        except:
-            pass
+            if f_index_in:
+                if f_key not in f_index_in.keys():
+                    f_index_in = False
+            if s_index_in:
+                if s_key not in s_index_in.keys():
+                    s_index_in = False
+            if operator == '=':
+                pass
+            elif operator == '!=':
+                pass
+            elif operator == '>':
+                pass
+            elif operator == '<':
+                pass
+            elif operator == '>=':
+                pass
+            elif operator == '<=':
+                pass
+            return line_list
+        except Exception as e:
+            print(e)
+            return None
 
     def isValued(self, condition, data_dict):
         v = re.match(r'\s*(\w+)\s*(=|!=|>|<|>=|<=)\s*(\w+|\d+)', condition)
@@ -502,46 +546,44 @@ class SqlManager(object):
         data_dict.dk_dict.append(dk)
         self.pickle_dump(table_name, data_dict)
 
-    def delete(self, string):
-        name = string.split()[2]
+    def delete(self, table_name, condition_list=None):
         goahead = False
-        part_delete = False
         for i in os.listdir('.'):
-            if i == name:
+            if i == table_name:
                 goahead = True
-
         if not goahead:
             print("Table Doesn't Exist")
             return
 
-        if len(string.split()) > 3:
-            if string.split()[3] == "where":
-                part_delete = True
-        data_dict = self.pickle_load(name)
+        data_dict = self.pickle_load(table_name)
+        index_in = self.index_check_return(data_dict)
 
-        if part_delete:
-            if not len(string.split()) > 4:
-                print("Command error")
-            tmp = string.split()[4:]
-            del_key_val = "".join(tmp)
-            if ',' in del_key_val:
-                pass
-            else:
-                del_key_val = del_key_val.split('=')
-                if len(del_key_val) != 2:
-                    print("command error")
-                    return
-                if del_key_val[0] in data_dict.get_keys():
-                    for item in data_dict.dk_dict:
-                        if item.get(del_key_val[0]) == del_key_val[1]:
-                            data_dict.dk_dict.remove(item)
+        if condition_list is not None:
+            result_list = self.deal_condition(condition_list, data_dict)
+            if result_list:
+                if index_in:
+                    for item in result_list:
+                        data_dict.dk_dict.remove(item[1])
+                        for key, value in index_in.items():
+                            for i in value:
+                                if i[1] == item[1]:
+                                    value.remove(i)
+                    index_dump = IndexDict()
+                    index_dump._attribute_list_index = index_in
+                    self.pickle_dump(data_dict.index_name, index_dump)
                 else:
-                    print("key doesn't exsit")
-                    return
+                    for item in result_list:
+                        data_dict.dk_dict.pop(item[1])
         else:
             # delete all data
             data_dict.clean_data()
-        self.pickle_dump(name, data_dict)
+            if index_in:
+                try:
+                    os.remove(data_dict.index_name)
+                    data_dict.index_name = None
+                except Exception as e:
+                    raise e
+        self.pickle_dump(table_name, data_dict)
 
     def update(self, string):
         # update a set key = value
