@@ -115,7 +115,7 @@ class SqlManager(object):
             self.update(string)
 
         elif command[0] == "select":
-            if 'where' in string:
+            if 'where' in command:
                 v = re.match(r'select\s+(.*\S)\s+from\s+(.*\S)\s+where\s*(.*\S)'
                              , string)
                 if ',' in v.group(2):
@@ -233,7 +233,7 @@ class SqlManager(object):
             table_dict[table_name.strip()] = self.pickle_load(table_name.strip())
 
         if condition_list is not None:
-            result_list = self.deal_condition(condition_list, table_dict)
+            result_list = self.deal_condition(condition_list, table_dict, True)
             print(result_list)
             if attr_list == "*":
                 pass
@@ -255,7 +255,7 @@ class SqlManager(object):
                             print("{} : {}".format(key, value), end=" ")
                     print()
 
-    def deal_condition(self, condition_list, data_dict):
+    def deal_condition(self, condition_list, data_dict, multi_type=False):
         table_list = list()
         if 'or' in condition_list:
             or_condition_list = condition_list.split('or')
@@ -264,7 +264,10 @@ class SqlManager(object):
                     tmp_list = list()
                     and_condition_list = or_condition.split('and')
                     for i, and_condition in enumerate(and_condition_list):
-                        line_list = self.isValued(and_condition, data_dict)
+                        if multi_type:
+                            line_list = self.isValued2(and_condition, data_dict)
+                        else:
+                            line_list = self.isValued(and_condition, data_dict)
                         if line_list is None or not line_list:
                             tmp_list = list()
                             break
@@ -276,14 +279,20 @@ class SqlManager(object):
                             break
                     table_list = combine_list(table_list, tmp_list)
                 else:
-                    line_list = self.isValued(or_condition, data_dict)
+                    if multi_type:
+                        line_list = self.isValued2(or_condition, data_dict)
+                    else:
+                        line_list = self.isValued(or_condition, data_dict)
                     if line_list is None:
                         continue
                     table_list = combine_list(table_list, line_list)
         elif 'and' in condition_list:
             and_condition_list = condition_list.split('and')
             for i, and_condition in enumerate(and_condition_list):
-                line_list = self.isValued(and_condition, data_dict)
+                if multi_type:
+                    line_list = self.isValued2(and_condition, data_dict)
+                else:
+                    line_list = self.isValued(and_condition, data_dict)
                 if line_list is None or not line_list:
                     return list()
                 if i == 0:
@@ -293,7 +302,10 @@ class SqlManager(object):
                 if not table_list:
                     return table_list
         else:
-            table_list = self.isValued(condition_list, data_dict)
+            if multi_type:
+                table_list = self.isValued2(condition_list, data_dict)
+            else:
+                table_list = self.isValued(condition_list, data_dict)
         return table_list
 
     def index_check_return(self, table):
@@ -335,7 +347,13 @@ class SqlManager(object):
                 if s_key not in s_index_in.keys():
                     s_index_in = False
             if operator == '=':
-                pass
+                for f_item in table_dict[f_table].dk_dict:
+                    for s_item in table_dict[s_table].dk_dict:
+                        if f_item[f_key] == s_item[s_key]:
+                            line_list.append((table_dict[f_table].tableName,
+                                              f_item))
+                            line_list.append((table_dict[s_table].tableName,
+                                              s_item))
             elif operator == '!=':
                 pass
             elif operator == '>':
