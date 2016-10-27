@@ -2,8 +2,34 @@ import pickle
 import os
 import re
 from collections import OrderedDict
-from queue import Queue
-import bisect
+# config name: sql_user_config
+
+
+class UserControl(object):
+    def __init__(self):
+        self._user_password = {'root': 'admin'}
+        self._user_table = {'root': []}
+
+    # when create user not create table
+    def add_user(self, user, password, table=list()):
+        self._user_password[user] = password
+        self._user_table[user] = table
+        # if table:
+        #     self._user_table[user] = [table]
+        # else:
+        #     self._user_table[user] = table
+
+    # when create table
+    def add_table(self, user, table):
+        self._user_table[user].append(table)
+
+    @property
+    def user_password(self):
+        return self._user_password
+
+    @property
+    def user_table(self):
+        return self._user_table
 
 
 def combine_list(list_a, list_b):
@@ -20,6 +46,7 @@ def combine_list(list_a, list_b):
                 new_list.append(b_value)
     return new_list
 
+
 class DataDict(object):
     def __init__(self, table_name):
         self.tableName = table_name
@@ -27,9 +54,14 @@ class DataDict(object):
         self._dk_dict = list()
         self.index_list = list()
         self._index_name = None
+        self._user = None
 
     def __str__(self):
         return self.tableName
+
+    @property
+    def username(self):
+        return self._user
 
     @property
     def key_value(self):
@@ -72,8 +104,23 @@ class IndexDict(object):
 
 
 class SqlManager(object):
-    def __init__(self):
-        pass
+    def __init__(self, user):
+        self.user_now = user
+        self.userObject = pickle_load('sql_user_config')
+
+    def __del__(self):
+        if self.user_now == 'root':
+            pickle_dump('sql_user_config', self.userObject)
+
+    def check_table(self, tableName):
+        try:
+            if self.userObject.user_table[self.user_now]:
+                if tableName in self.userObject.user_table[self.user_now]:
+                    return True
+                else:
+                    return False
+        except Exception as e:
+            print(e)
 
     def execute(self, string):
         command = string.split()
@@ -456,6 +503,10 @@ class SqlManager(object):
         self.pickle_dump(name, date)
 
     def insert(self, table_name, attribute_list, values_list):
+        is_user_table = self.check_table(table_name)
+        if not is_user_table:
+            print("You do not have permission to make changes to the table!")
+            return
         goahead = False
         for i in os.listdir('.'):
             if i == table_name:
@@ -474,6 +525,10 @@ class SqlManager(object):
                 print("Given not matching")
                 return
             for i, key in enumerate(data_keys):
+                if ('not null' in data_dict.key_value[key]
+                    and values[i].strip() == 'null'):
+                    print("{} key could not be null".format(key))
+                    return
                 # primary key check
                 if 'primary key' in data_dict.key_value[key]:
                     if 'int' in data_dict.key_value[key]:
@@ -523,6 +578,10 @@ class SqlManager(object):
             for i, key in enumerate(attribute_list):
                 key = key.strip()
                 # primary key check
+                if ('not null' in data_dict.key_value[key]
+                    and values[i].strip() == 'null'):
+                    print("{} key could not be null".format(key))
+                    return
                 if 'primary key' in data_dict.key_value[key]:
                     if 'int' in data_dict.key_value[key]:
                         for item in data_dict.dk_dict:
@@ -565,6 +624,10 @@ class SqlManager(object):
         self.pickle_dump(table_name, data_dict)
 
     def delete(self, table_name, condition_list=None):
+        is_user_table = self.check_table(table_name)
+        if not is_user_table:
+            print("You do not have permission to make changes to the table!")
+            return
         goahead = False
         for i in os.listdir('.'):
             if i == table_name:
@@ -603,6 +666,7 @@ class SqlManager(object):
                     raise e
         self.pickle_dump(table_name, data_dict)
 
+    # 未更改
     def update(self, string):
         # update a set key = value
         # update a set key = value where key = value
@@ -649,6 +713,7 @@ class SqlManager(object):
                 return
         self.pickle_dump(name, data_dict)
 
+    # 未更改
     def alter_add(self, string):
         # alter table a add key char/int primary key
         if len(string.split()) < 6:
@@ -677,6 +742,7 @@ class SqlManager(object):
 
         self.pickle_dump(name, data_dict)
 
+    # 未更改
     def alter_drop(self, string):
         # alter table a drop key char/int primary key
         if len(string.split()) < 6:
@@ -710,6 +776,7 @@ class SqlManager(object):
 
         self.pickle_dump(name, data_dict)
 
+    # 未更改
     def drop(self, string):
         name = string.split()[2].strip()
         try:
@@ -717,13 +784,40 @@ class SqlManager(object):
         except Exception as e:
             raise e
 
+
+def pickle_load(f_name):
+    with open(f_name, 'rb') as file:
+        return pickle.load(file)
+
+
+def pickle_dump(f_name, obj):
+    with open(f_name, 'wb') as file:
+        pickle.dump(obj, file)
+
+
+def check():
+    username = input("DB Username: ")
+    password = input("Password: ")
+    userObject = pickle_load('sql_user_config')
+    if username not in userObject.user_password.keys():
+        print("User not exist!")
+        return False
+    if userObject.user_password[username] != password:
+        print("Wrong password!")
+        return False
+    else:
+        print("Login success!")
+        return username
+
 if __name__ == '__main__':
     print("SQL PLUS")
-    command = input('>>>')
-    executor = SqlManager()
-    while command != 'exit':
-        try:
-            executor.execute(command)
-        except Exception as e:
-            print(e)
+    username = check()
+    if username:
         command = input('>>>')
+        executor = SqlManager(username)
+        while command != 'exit':
+            try:
+                executor.execute(command)
+            except Exception as e:
+                print(e)
+            command = input('>>>')
