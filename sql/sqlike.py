@@ -666,52 +666,68 @@ class SqlManager(object):
                     raise e
         self.pickle_dump(table_name, data_dict)
 
-    # 未更改
-    def update(self, string):
+    def update(self, table_name, attribute, value, condition_list=None):
         # update a set key = value
         # update a set key = value where key = value
-        name = string.split()[1]
+        is_user_table = self.check_table(table_name)
+        if not is_user_table:
+            print("You do not have permission to make changes to the table!")
+            return
         goahead = False
         for i in os.listdir('.'):
-            if i == name:
+            if i == table_name:
                 goahead = True
-
         if not goahead:
             print("Table Doesn't Exist")
             return
 
-        data_dict = self.pickle_load(name)
+        data_dict = self.pickle_load(table_name)
+        index_in = self.index_check_return(data_dict)
 
-        command = string.split()[3:]
+        if attribute not in data_dict.get_keys():
+            print("bad key you given!")
+            return
+        elif ('primary key' in data_dict.key_value[attribute]
+              and value == 'null'):
+            print("primary key couldn't be null type")
+            return
 
-        if "where" in command:
-            tmp = " ".join(command)
-            tmp = tmp.split("where")
-            f_key = tmp[0].split('=')
-            l_key = tmp[1].split('=')
-            if len(f_key) != 2:
-                print("command error")
-            if f_key[0].strip() not in data_dict.get_keys():
-                print("Error Key or Value you given")
-                return
-            if l_key[0].strip() not in data_dict.get_keys():
-                print("Error Key or Value you given")
-                return
-            for item in data_dict.dk_dict:
-                if item[l_key[0].strip()] == l_key[1].strip():
-                    item[f_key[0].strip()] = f_key[1].strip()
-        else:
-            if '=' in command and len(command) == 3:
-                if command[0] in data_dict.get_keys():
-                    for item in data_dict.dk_dict:
-                        item[command[0]] = command[2]
+        if condition_list is not None:
+            result_list = self.deal_condition(condition_list, data_dict)
+            if result_list:
+                if index_in and attribute in index_in.keys():
+                    for item in result_list:
+                        for i, line in enumerate(data_dict.dk_dict):
+                            if line == item[1]:
+                                data_dict[i][attribute] = value
+                        for key, value in index_in.items():
+                            for i in value:
+                                if i[1] == item[1]:
+                                    # value.remove(i)
+                                    pass
+                    index_dump = IndexDict()
+                    index_dump._attribute_list_index = index_in
+                    self.pickle_dump(data_dict.index_name, index_dump)
                 else:
-                    print("Error Key or Value you given")
-                    return
+                    for item in result_list:
+                        for i, line in enumerate(data_dict.dk_dict):
+                            if line == item[1]:
+                                data_dict[i][attribute] = value
+        else:
+            if 'primary key' not in data_dict.key_value[attribute]:
+                for item in data_dict.dk_dict:
+                    item[attribute] = value
+                # 索引
+                if index_in and attribute in index_in.keys():
+                    for sql_line in index_in[attribute]:
+                        sql_line[0] = value
+                    for key, value in index_in:
+                        for line in value:
+                            line[1][attribute] = value
             else:
-                print("Command error")
+                print("You couldn't update the same value of all  primary key")
                 return
-        self.pickle_dump(name, data_dict)
+        self.pickle_dump(table_name, data_dict)
 
     # 未更改
     def alter_add(self, string):
