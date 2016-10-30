@@ -2,6 +2,7 @@ import pickle
 import os
 import re
 from collections import OrderedDict
+from time import time
 # config name: sql_user_config
 
 
@@ -156,10 +157,11 @@ class SqlManager(object):
                 v = re.match(
                     r'update\s+(\w+)\s+set\s+(\w+)\s+=\s+(\w+)\s+where\s+(.*\S)'
                     , string)
+                self.update(v.group(1), v.group(2), v.group(3), v.group(4))
             else:
                 v = re.match(r'update\s+(\w+)\s+set\s+(\w+)\s+=\s+(\w+)'
                              , string)
-            self.update(string)
+                self.update(v.group(1), v.group(2), v.group(3))
 
         elif command[0] == "select":
             if 'where' in command:
@@ -186,7 +188,11 @@ class SqlManager(object):
             self.alter_drop(string)
         elif command[0] == 'drop':
             v = re.match(r'drop\s+table\s+(\w+)', string)
-            self.drop(string)
+            try:
+                self.drop(v.group(1))
+            except:
+                print("command error")
+                return
         elif command[0] == 'create' and command[1] == 'index':
             v = re.match(r'create\s+index\s+(\w+)\s+on\s+(.*\S)\s+\((.*)\)'
                          , string)
@@ -404,13 +410,33 @@ class SqlManager(object):
             elif operator == '!=':
                 pass
             elif operator == '>':
-                pass
+                for f_item in table_dict[f_table].dk_dict:
+                    for s_item in table_dict[s_table].dk_dict:
+                        if f_item[f_key] > s_item[s_key]:
+                            line_list.append((table_dict[f_table].tableName,
+                                              f_item))
+                            break
             elif operator == '<':
-                pass
+                for f_item in table_dict[f_table].dk_dict:
+                    for s_item in table_dict[s_table].dk_dict:
+                        if f_item[f_key] < s_item[s_key]:
+                            line_list.append((table_dict[f_table].tableName,
+                                              f_item))
+                            break
             elif operator == '>=':
-                pass
+                for f_item in table_dict[f_table].dk_dict:
+                    for s_item in table_dict[s_table].dk_dict:
+                        if f_item[f_key] >= s_item[s_key]:
+                            line_list.append((table_dict[f_table].tableName,
+                                              f_item))
+                            break
             elif operator == '<=':
-                pass
+                for f_item in table_dict[f_table].dk_dict:
+                    for s_item in table_dict[s_table].dk_dict:
+                        if f_item[f_key] >= s_item[s_key]:
+                            line_list.append((table_dict[f_table].tableName,
+                                              f_item))
+                            break
             return line_list
         except Exception as e:
             print(e)
@@ -441,6 +467,7 @@ class SqlManager(object):
                                 line_list.append((data_dict.tableName, data[1]))
                                 if datas[i + 1] != value:
                                     break
+
                     else:
                         for item in data_dict.dk_dict:
                             if item[key] == value:
@@ -691,6 +718,11 @@ class SqlManager(object):
               and value == 'null'):
             print("primary key couldn't be null type")
             return
+        elif ('not null' in data_dict.key_value[attribute] and
+              value == 'null'):
+            print("{} has set not null, value couldn't null"
+                  .format(attribute))
+            return
 
         if condition_list is not None:
             result_list = self.deal_condition(condition_list, data_dict)
@@ -793,10 +825,9 @@ class SqlManager(object):
         self.pickle_dump(name, data_dict)
 
     # 未更改
-    def drop(self, string):
-        name = string.split()[2].strip()
+    def drop(self, table_name):
         try:
-            os.remove(name)
+            os.remove(table_name)
         except Exception as e:
             raise e
 
