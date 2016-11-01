@@ -9,20 +9,19 @@ from time import time
 class UserControl(object):
     def __init__(self):
         self._user_password = {'root': 'admin'}
-        self._user_table = {'root': []}
+        self._user_table = {'root': dict()}
 
     # when create user not create table
-    def add_user(self, user, password, table=list()):
+    def add_user(self, user, password):
         self._user_password[user] = password
-        self._user_table[user] = table
-        # if table:
-        #     self._user_table[user] = [table]
-        # else:
-        #     self._user_table[user] = table
+        self._user_table[user] = dict()
 
     # when create table
     def add_table(self, user, table):
-        self._user_table[user].append(table)
+        self._user_table[user][table] = list()
+
+    def add_table_list(self, user, table, command):
+        self._user_table[user][table].append(command)
 
     @property
     def user_password(self):
@@ -113,10 +112,22 @@ class SqlManager(object):
         if self.user_now == 'root':
             pickle_dump('sql_user_config', self.userObject)
 
-    def check_table(self, tableName):
+    def show_user(self, table_name):
         try:
             if self.userObject.user_table[self.user_now]:
-                if tableName in self.userObject.user_table[self.user_now]:
+                for item in self.userObject.user_table[self.user_now]:
+                    if table_name in item.keys():
+                        for key, value in item.items():
+                            print("{} : {}", key, value)
+        except Exception as e:
+            print(e)
+
+    def check_table(self, tableName, execute_command):
+        try:
+            if self.userObject.user_table[self.user_now]:
+                if (tableName in self.userObject.user_table[self.user_now].keys()
+                    and execute_command in
+                        self.userObject.user_table[self.user_now][tableName]):
                     return True
                 else:
                     return False
@@ -197,8 +208,42 @@ class SqlManager(object):
             v = re.match(r'create\s+index\s+(\w+)\s+on\s+(.*\S)\s+\((.*)\)'
                          , string)
             self.create_index(v.group(1), v.group(2), v.group(3))
+        elif command[0] == 'create' and command[1] == 'user':
+            v = re.match(r'create\s+user\s+(\w+)\s+identified\s+by\s+(\w+)', string)
+            self.create_user(v.group(1), v.group(2))
+        elif command[0] == 'grant':
+            v = re.match(r'grant\s+\((.*)\)\s+on\s+(\w+)\s+to\s+(\w+)', string)
+            self.grant(v.group(1), v.group(2), v.group(3))
+        elif command[0] == 'su':
+            v = re.match(r'su\s+(\w+)', string)
+            self.change_user(v.group(1))
         else:
             print("Error Command")
+
+    def grant(self, command_list, table_name, user):
+        command_list = command_list.split(',')
+        if self.user_now == 'root':
+            for command in command_list:
+                self.userObject.add_table_list(user, table_name, command)
+            pickle_dump('sql_user_config', self.userObject)
+            self.userObject = pickle_load('sql_user_config')
+            return True
+        else:
+            print("You are not root user!")
+            return False
+
+    def change_user(self, username):
+        self.user_now = username
+
+    def create_user(self, user_name, password):
+        if self.user_now == 'root':
+            self.userObject.add_user(user_name, password)
+            pickle_dump('sql_user_config', self.userObject)
+            self.userObject = pickle_load('sql_user_config')
+            return True
+        else:
+            print("You are not root user!")
+            return False
 
     def create_index(self, index_name, table_name, attribute_list):
         goahead = False
@@ -243,6 +288,10 @@ class SqlManager(object):
         return [[k, all_dict[k]] for k in sorted(all_dict.keys())]
 
     def select_single(self, attr_list, table_name, condition_list=None):
+        is_user_table = self.check_table(table_name, 'select')
+        if not is_user_table:
+            print("You do not have permission to make changes to the table!")
+            return
         goahead = False
         for f_name in os.listdir('.'):
             if f_name == table_name:
@@ -255,11 +304,17 @@ class SqlManager(object):
 
         if condition_list is not None:
             result_list = self.deal_condition(condition_list, data_dict)
-            print(result_list)
             if attr_list == "*":
-                pass
+                for sql_tuple in result_list:
+                    for key, value in sql_tuple[1].items():
+                        print("{} : {}".format(key, value), end=" ")
+                    print()
             else:
-                pass
+                for sql_tuple in result_list:
+                    for key, value in sql_tuple[1].items():
+                        if key in attr_list:
+                            print("{} : {}".format(key, value), end=" ")
+                    print()
         elif attr_list == '*':
             for item in data_dict.dk_dict:
                 for key, value in item.items():
@@ -280,6 +335,10 @@ class SqlManager(object):
             for f_name in os.listdir('.'):
                 if f_name == table_name.strip():
                     goahead = True
+                is_user_table = self.check_table(table_name.strip(), 'select')
+                if not is_user_table:
+                    print("You do not have permission to make changes to the table!")
+                    return
             if not goahead:
                 print("table {} doesn't exist".format(table_name.strip()))
                 return
@@ -289,9 +348,16 @@ class SqlManager(object):
             result_list = self.deal_condition(condition_list, table_dict, True)
             print(result_list)
             if attr_list == "*":
-                pass
+                for sql_tuple in result_list:
+                    for key, value in sql_tuple[1].items():
+                        print("{} : {}".format(key, value), end=" ")
+                    print()
             else:
-                pass
+                for sql_tuple in result_list:
+                    for key, value in sql_tuple[1].items():
+                        if key in attr_list:
+                            print("{} : {}".format(key, value), end=" ")
+                    print()
         elif attr_list == '*':
             for table_name in table_name_list:
                 print("Table---->{}<-----".format(table_name.strip()))
@@ -525,12 +591,13 @@ class SqlManager(object):
                 print("Table Exist")
                 return
         date = DataDict(name)
+        self.userObject.add_table(self.user_now, name)
         for attr in command:
             date.key_value[attr.split()[0]] = " ".join(attr.split()[1:])
         self.pickle_dump(name, date)
 
     def insert(self, table_name, attribute_list, values_list):
-        is_user_table = self.check_table(table_name)
+        is_user_table = self.check_table(table_name, 'insert')
         if not is_user_table:
             print("You do not have permission to make changes to the table!")
             return
@@ -651,7 +718,7 @@ class SqlManager(object):
         self.pickle_dump(table_name, data_dict)
 
     def delete(self, table_name, condition_list=None):
-        is_user_table = self.check_table(table_name)
+        is_user_table = self.check_table(table_name, 'delete')
         if not is_user_table:
             print("You do not have permission to make changes to the table!")
             return
@@ -696,7 +763,7 @@ class SqlManager(object):
     def update(self, table_name, attribute, value, condition_list=None):
         # update a set key = value
         # update a set key = value where key = value
-        is_user_table = self.check_table(table_name)
+        is_user_table = self.check_table(table_name, 'update')
         if not is_user_table:
             print("You do not have permission to make changes to the table!")
             return
@@ -824,7 +891,6 @@ class SqlManager(object):
 
         self.pickle_dump(name, data_dict)
 
-    # 未更改
     def drop(self, table_name):
         try:
             os.remove(table_name)
