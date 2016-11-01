@@ -21,7 +21,11 @@ class UserControl(object):
         self._user_table[user][table] = list()
 
     def add_table_list(self, user, table, command):
-        self._user_table[user][table].append(command)
+        try:
+            self._user_table[user][table].append(command)
+        except:
+            self.add_table(user, table)
+            self._user_table[user][table].append(command)
 
     @property
     def user_password(self):
@@ -346,7 +350,6 @@ class SqlManager(object):
 
         if condition_list is not None:
             result_list = self.deal_condition(condition_list, table_dict, True)
-            print(result_list)
             if attr_list == "*":
                 for sql_tuple in result_list:
                     for key, value in sql_tuple[1].items():
@@ -473,40 +476,46 @@ class SqlManager(object):
                                               f_item))
                             line_list.append((table_dict[s_table].tableName,
                                               s_item))
-            elif operator == '!=':
-                pass
-            elif operator == '>':
-                for f_item in table_dict[f_table].dk_dict:
-                    for s_item in table_dict[s_table].dk_dict:
-                        if f_item[f_key] > s_item[s_key]:
-                            line_list.append((table_dict[f_table].tableName,
-                                              f_item))
-                            break
-            elif operator == '<':
-                for f_item in table_dict[f_table].dk_dict:
-                    for s_item in table_dict[s_table].dk_dict:
-                        if f_item[f_key] < s_item[s_key]:
-                            line_list.append((table_dict[f_table].tableName,
-                                              f_item))
-                            break
-            elif operator == '>=':
-                for f_item in table_dict[f_table].dk_dict:
-                    for s_item in table_dict[s_table].dk_dict:
-                        if f_item[f_key] >= s_item[s_key]:
-                            line_list.append((table_dict[f_table].tableName,
-                                              f_item))
-                            break
-            elif operator == '<=':
-                for f_item in table_dict[f_table].dk_dict:
-                    for s_item in table_dict[s_table].dk_dict:
-                        if f_item[f_key] >= s_item[s_key]:
-                            line_list.append((table_dict[f_table].tableName,
-                                              f_item))
-                            break
             return line_list
-        except Exception as e:
-            print(e)
-            return None
+        except:
+            v = re.match(r'\s*(\w+)\.(\w+)\s*(=|!=|>|<|>=|<=)\s*(\w+)', condition)
+            try:
+                table = v.group(1)
+                key = v.group(2)
+                value = v.group(4)
+                if value.isdigit():
+                    value = int(value)
+                operator = v.group(3)
+                line_list = list()
+                if operator == '=':
+                    for item in table_dict[table].dk_dict:
+                        if item[key] == value:
+                            line_list.append((table_dict[table].tableName,
+                                                item))
+                elif operator == '!=':
+                    for item in table_dict[table].dk_dict:
+                        if item[key] != value:
+                            line_list.append((table_dict[table].tableName, item))
+                elif operator == '>':
+                    for item in table_dict[table].dk_dict:
+                        if item[key] > value:
+                            line_list.append((table_dict[table].tableName, item))
+                elif operator == '<':
+                    for item in table_dict[table].dk_dict:
+                        if item[key] < value:
+                            line_list.append((table_dict[table].tableName, item))
+                elif operator == '>=':
+                    for item in table_dict[table].dk_dict:
+                        if item[key] >= value:
+                            line_list.append((table_dict[table].tableName, item))
+                elif operator == '<=':
+                    for item in table_dict[table].dk_dict:
+                        if item[key] <= value:
+                            line_list.append((table_dict[table].tableName, item))
+                return line_list
+            except Exception as e:
+                print(e)
+                return None
 
     def isValued(self, condition, data_dict):
         v = re.match(r'\s*(\w+)\s*(=|!=|>|<|>=|<=)\s*(\w+|\d+)', condition)
@@ -533,7 +542,6 @@ class SqlManager(object):
                                 line_list.append((data_dict.tableName, data[1]))
                                 if datas[i + 1] != value:
                                     break
-
                     else:
                         for item in data_dict.dk_dict:
                             if item[key] == value:
